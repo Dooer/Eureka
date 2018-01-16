@@ -577,7 +577,7 @@ open class FormViewController: UIViewController, FormViewControllerProtocol, For
         guard let _ = tableView, (form.inlineRowHideOptions ?? Form.defaultInlineRowHideOptions).contains(.FirstResponderChanges) else { return }
         
         if isExpandedInlineRowsCollapseDelayed {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: { [weak self] _ in
+            DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + 0.5, execute: { [weak self] in
                 self?.colapseRows(except: cell)
             })
         } else {
