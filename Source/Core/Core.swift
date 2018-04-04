@@ -110,20 +110,8 @@ public enum ControllerProvider<VCType: UIViewController> {
 }
 
 /**
- *  Responsible for the options passed to a selector view controller
- */
-public struct DataProvider<T> where T: Equatable {
-
-    public let arrayData: [T]?
-
-    public init(arrayData: [T]) {
-        self.arrayData = arrayData
-    }
-}
-
-/**
  Defines how a controller should be presented.
- 
+
  - Show?:           Shows the controller with `showViewController(...)`.
  - PresentModally?: Presents the controller modally.
  - SegueName?:      Performs the segue with the specified identifier (name).
@@ -405,12 +393,6 @@ public struct InlineRowHideOptions: OptionSet {
 open class FormViewController: UIViewController, FormViewControllerProtocol, FormDelegate {
 
     @IBOutlet public var tableView: UITableView!
-    
-    /// Whether expanded inline rows should be made visible automatically. Defaults to `true`.
-    open var isInlineRowsMadeVisibleOnExpansion: Bool = true
-    
-    /// Whether the colapse of expanded inline rows should be delayed by 0.5 seconds. Defaults to `false`.
-    open var isExpandedInlineRowsCollapseDelayed: Bool = false
 
     private lazy var _form: Form = { [weak self] in
         let form = Form()
@@ -479,16 +461,8 @@ open class FormViewController: UIViewController, FormViewControllerProtocol, For
         if tableView.dataSource == nil {
             tableView.dataSource = self
         }
-        
         tableView.rowHeight = UITableViewAutomaticDimension
-        tableView.sectionHeaderHeight = UITableViewAutomaticDimension
-        tableView.sectionFooterHeight = UITableViewAutomaticDimension
-        
         tableView.estimatedRowHeight = BaseRow.estimatedRowHeight
-        tableView.estimatedSectionHeaderHeight = 0 // Else sections without headers take up too much space initially.
-        tableView.estimatedSectionFooterHeight = 0 // Else sections without footers take up too much space initially.
-
-        tableView.setEditing(true, animated: false)
         tableView.allowsSelectionDuringEditing = true
     }
 
@@ -573,19 +547,7 @@ open class FormViewController: UIViewController, FormViewControllerProtocol, For
         cell.row.updateCell()
         RowDefaults.onCellHighlightChanged["\(type(of: cell.row!))"]?(cell, cell.row)
         cell.row.callbackOnCellHighlightChanged?()
-        
         guard let _ = tableView, (form.inlineRowHideOptions ?? Form.defaultInlineRowHideOptions).contains(.FirstResponderChanges) else { return }
-        
-        if isExpandedInlineRowsCollapseDelayed {
-            DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + 0.5, execute: { [weak self] in
-                self?.colapseRows(except: cell)
-            })
-        } else {
-            colapseRows(except: cell)
-        }
-    }
-    
-    private func colapseRows<T: Equatable>(except cell: Cell<T>) {
         let row = cell.baseRow
         let inlineRow = row?._inlineRow
         for row in form.allRows.filter({ $0 !== row && $0 !== inlineRow && $0._inlineRow != nil }) {
@@ -822,7 +784,7 @@ extension FormViewController : UITableViewDelegate {
     }
 
     open func tableView(_ tableView: UITableView, estimatedHeightForRowAt indexPath: IndexPath) -> CGFloat {
-        guard tableView == self.tableView else { return tableView.rowHeight }
+        guard tableView == self.tableView else { return tableView.estimatedRowHeight }
         let row = form[indexPath.section][indexPath.row]
         return row.baseCell.height?() ?? tableView.estimatedRowHeight
     }
@@ -945,7 +907,7 @@ extension FormViewController : UITableViewDelegate {
 
     open func tableView(_ tableView: UITableView, editingStyleForRowAt indexPath: IndexPath) -> UITableViewCellEditingStyle {
         guard let section = form[indexPath.section] as? MultivaluedSection else {
-			if form[indexPath].trailingSwipe.actions.count > 0{
+			if form[indexPath].trailingSwipe.actions.count > 0 {
 				return .delete
 			}
             return .none
@@ -974,7 +936,10 @@ extension FormViewController : UITableViewDelegate {
 	}
 
 	public func tableView(_ tableView: UITableView, editActionsForRowAt indexPath: IndexPath) -> [UITableViewRowAction]?{
-		return form[indexPath].trailingSwipe.contextualActions as? [UITableViewRowAction]
+        guard let actions = form[indexPath].trailingSwipe.contextualActions as? [UITableViewRowAction], !actions.isEmpty else {
+            return nil
+        }
+        return actions
 	}
 }
 
@@ -1122,10 +1087,10 @@ extension FormViewControllerProtocol {
 
     // MARK: Helpers
 
-    func makeRowVisible(_ row: BaseRow) {
+    func makeRowVisible(_ row: BaseRow, destinationScrollPosition: UITableViewScrollPosition) {
         guard let cell = row.baseCell, let indexPath = row.indexPath, let tableView = tableView else { return }
         if cell.window == nil || (tableView.contentOffset.y + tableView.frame.size.height <= cell.frame.origin.y + cell.frame.size.height) {
-            tableView.scrollToRow(at: indexPath, at: .bottom, animated: true)
+            tableView.scrollToRow(at: indexPath, at: destinationScrollPosition, animated: true)
         }
     }
 }

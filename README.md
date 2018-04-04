@@ -12,6 +12,8 @@
 
 Made with ❤️ by [XMARTLABS](http://xmartlabs.com). This is the re-creation of [XLForm] in Swift.
 
+[简体中文](Documentation/README_CN.md)
+
 ## Overview
 
 <table>
@@ -54,8 +56,8 @@ Made with ❤️ by [XMARTLABS](http://xmartlabs.com). This is the re-creation o
 
 ## Requirements
 
-* Xcode 9+
-* Swift 4
+* Xcode 9.2+
+* Swift 4+
 
 ### Example project
 
@@ -398,7 +400,8 @@ Note that if you want to disable a row permanently you can also set `disabled` v
 ### List Sections
 
 To display a list of options, Eureka includes a special section called `SelectableSection`.
-When creating one you need to pass the type of row to use in the options and the `selectionStyle`. The `selectionStyle` is an enum which can be either `multipleSelection` or `singleSelection(enableDeselection: Bool)` where the `enableDeselection` parameter determines if the selected rows can be deselected or not.
+When creating one you need to pass the type of row to use in the options and the `selectionType`.
+The `selectionType` is an enum which can be either `multipleSelection` or `singleSelection(enableDeselection: Bool)` where the `enableDeselection` parameter determines if the selected rows can be deselected or not.
 
 ```swift
 form +++ SelectableSection<ListCheckRow<String>>("Where do you live", selectionType: .singleSelection(enableDeselection: true))
@@ -950,6 +953,7 @@ Let us know about it, we would be glad to mention it here. :)
 Specify Eureka into your project's `Podfile`:
 
 ```ruby
+source 'https://github.com/CocoaPods/Specs.git'
 platform :ios, '9.0'
 use_frameworks!
 
