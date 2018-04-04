@@ -59,9 +59,9 @@ public struct CellProvider<Cell: BaseCell> where Cell: CellType {
 
     /**
      Creates the cell with the specified style.
-     
+
      - parameter cellStyle: The style with which the cell will be created.
-     
+
      - returns: the cell
      */
     func makeCell(style: UITableViewCellStyle) -> Cell {
@@ -74,7 +74,7 @@ public struct CellProvider<Cell: BaseCell> where Cell: CellType {
 
 /**
  Enumeration that defines how a controller should be created.
- 
+
  - Callback->VCType: Creates the controller inside the specified block
  - NibFile:          Loads a controller from a nib file in some bundle
  - StoryBoard:       Loads the controller from a Storyboard by its storyboard id
@@ -170,7 +170,7 @@ public enum PresentationMode<VCType: UIViewController> {
 
     /**
      Present the view controller provided by PresentationMode. Should only be used from custom row implementation.
-     
+
      - parameter viewController:           viewController to present if it makes sense (normally provided by makeController method)
      - parameter row:                      associated row
      - parameter presentingViewController: form view controller
@@ -199,7 +199,7 @@ public enum PresentationMode<VCType: UIViewController> {
 
     /**
      Creates the view controller specified by presentation mode. Should only be used from custom row implementation.
-     
+
      - returns: the created view controller or nil depending on the PresentationMode type.
      */
     public func makeController() -> VCType? {
@@ -247,7 +247,7 @@ enum ConditionType {
 
 /**
  Enumeration that are used to specify the disbaled and hidden conditions of rows
- 
+
  - Function:  A function that calculates the result
  - Predicate: A predicate that returns the result
  */
@@ -527,6 +527,10 @@ open class FormViewController: UIViewController, FormViewControllerProtocol, For
 
         NotificationCenter.default.addObserver(self, selector: #selector(FormViewController.keyboardWillShow(_:)), name: Notification.Name.UIKeyboardWillShow, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(FormViewController.keyboardWillHide(_:)), name: Notification.Name.UIKeyboardWillHide, object: nil)
+
+        if form.containsMultivaluedSection {
+            tableView.setEditing(true, animated: false)
+        }
     }
 
     open override func viewWillDisappear(_ animated: Bool) {
@@ -573,7 +577,7 @@ open class FormViewController: UIViewController, FormViewControllerProtocol, For
         guard let _ = tableView, (form.inlineRowHideOptions ?? Form.defaultInlineRowHideOptions).contains(.FirstResponderChanges) else { return }
         
         if isExpandedInlineRowsCollapseDelayed {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: { [weak self] _ in
+            DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + 0.5, execute: { [weak self] in
                 self?.colapseRows(except: cell)
             })
         } else {
@@ -710,44 +714,44 @@ open class FormViewController: UIViewController, FormViewControllerProtocol, For
             inlineRow.collapseInlineRow()
         }
     }
-    
+
     // MARK: FormDelegate
-    
+
     open func sectionsHaveBeenAdded(_ sections: [Section], at indexes: IndexSet) {
         guard animateTableView else { return }
         tableView?.beginUpdates()
         tableView?.insertSections(indexes, with: insertAnimation(forSections: sections))
         tableView?.endUpdates()
     }
-    
+
     open func sectionsHaveBeenRemoved(_ sections: [Section], at indexes: IndexSet) {
         guard animateTableView else { return }
         tableView?.beginUpdates()
         tableView?.deleteSections(indexes, with: deleteAnimation(forSections: sections))
         tableView?.endUpdates()
     }
-    
+
     open func sectionsHaveBeenReplaced(oldSections: [Section], newSections: [Section], at indexes: IndexSet) {
         guard animateTableView else { return }
         tableView?.beginUpdates()
         tableView?.reloadSections(indexes, with: reloadAnimation(oldSections: oldSections, newSections: newSections))
         tableView?.endUpdates()
     }
-    
+
     open func rowsHaveBeenAdded(_ rows: [BaseRow], at indexes: [IndexPath]) {
         guard animateTableView else { return }
         tableView?.beginUpdates()
         tableView?.insertRows(at: indexes, with: insertAnimation(forRows: rows))
         tableView?.endUpdates()
     }
-    
+
     open func rowsHaveBeenRemoved(_ rows: [BaseRow], at indexes: [IndexPath]) {
         guard animateTableView else { return }
         tableView?.beginUpdates()
         tableView?.deleteRows(at: indexes, with: deleteAnimation(forRows: rows))
         tableView?.endUpdates()
     }
-    
+
     open func rowsHaveBeenReplaced(oldRows: [BaseRow], newRows: [BaseRow], at indexes: [IndexPath]) {
         guard animateTableView else { return }
         tableView?.beginUpdates()
@@ -759,6 +763,38 @@ open class FormViewController: UIViewController, FormViewControllerProtocol, For
 
     var oldBottomInset: CGFloat?
     var animateTableView = false
+
+    /** Calculates the height needed for a header or footer. */
+    fileprivate func height(specifiedHeight: (() -> CGFloat)?, sectionView: UIView?, sectionTitle: String?) -> CGFloat {
+        if let height = specifiedHeight {
+            return height()
+        }
+
+        if let sectionView = sectionView {
+            let height = sectionView.bounds.height
+
+            if height == 0 {
+                return UITableViewAutomaticDimension
+            }
+
+            return height
+        }
+
+        if let sectionTitle = sectionTitle,
+            sectionTitle != "" {
+            return UITableViewAutomaticDimension
+        }
+
+        // Fix for iOS 11+. By returning 0, we ensure that no section header or
+        // footer is shown when self-sizing is enabled (i.e. when
+        // tableView.estimatedSectionHeaderHeight or tableView.estimatedSectionFooterHeight
+        // == UITableViewAutomaticDimension).
+        if tableView.style == .plain {
+            return 0
+        }
+
+        return UITableViewAutomaticDimension
+    }
 }
 
 extension FormViewController : UITableViewDelegate {
@@ -800,61 +836,23 @@ extension FormViewController : UITableViewDelegate {
     }
 
     open func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
-        if let height = form[section].header?.height {
-            return height()
-        }
-        
-        let view = form[section].header?.viewForSection(form[section], type: .header)
-        
-        if view == nil && form[section].header?.title != nil {
-            // View will be generated by titleForHeaderInSection.
-            return UITableViewAutomaticDimension
-        }
-        
-        guard let unwrappedView = view else {
-            // No view and no title, header should be 0 height.
-            return 0
-        }
-        
-        guard unwrappedView.bounds.height != 0 else {
-            // View uses autolayout.
-            return UITableViewAutomaticDimension
-        }
-        
-        // View uses static layout.
-        return unwrappedView.bounds.height
+        return height(specifiedHeight: form[section].header?.height,
+                      sectionView: self.tableView(tableView, viewForHeaderInSection: section),
+                      sectionTitle: self.tableView(tableView, titleForHeaderInSection: section))
     }
 
     open func tableView(_ tableView: UITableView, heightForFooterInSection section: Int) -> CGFloat {
-        if let height = form[section].footer?.height {
-            return height()
-        }
-        
-        let view = form[section].footer?.viewForSection(form[section], type: .footer)
-        
-        if view == nil && form[section].footer?.title != nil {
-            // View will be generated by titleForFooterInSection.
-            return UITableViewAutomaticDimension
-        }
-        
-        guard let unwrappedView = view else {
-            // No view and no title, footer should be 0 height.
-            return 0
-        }
-        
-        guard unwrappedView.bounds.height != 0 else {
-            // View uses autolayout.
-            return UITableViewAutomaticDimension
-        }
-        
-        // View uses static layout.
-        return unwrappedView.bounds.height
+        return height(specifiedHeight: form[section].footer?.height,
+                      sectionView: self.tableView(tableView, viewForFooterInSection: section),
+                      sectionTitle: self.tableView(tableView, titleForFooterInSection: section))
     }
 
     open func tableView(_ tableView: UITableView, canEditRowAt indexPath: IndexPath) -> Bool {
-        guard let section = form[indexPath.section] as? MultivaluedSection else { return false }
-        let row = form[indexPath]
+		let row = form[indexPath]
         guard !row.isDisabled else { return false }
+		if row.trailingSwipe.actions.count > 0 { return true }
+		if #available(iOS 11,*), row.leadingSwipe.actions.count > 0 { return true }
+		guard let section = form[indexPath.section] as? MultivaluedSection else { return false }
         guard !(indexPath.row == section.count - 1 && section.multivaluedOptions.contains(.Insert) && section.showInsertIconInAddButton) else {
             return true
         }
@@ -947,6 +945,9 @@ extension FormViewController : UITableViewDelegate {
 
     open func tableView(_ tableView: UITableView, editingStyleForRowAt indexPath: IndexPath) -> UITableViewCellEditingStyle {
         guard let section = form[indexPath.section] as? MultivaluedSection else {
+			if form[indexPath].trailingSwipe.actions.count > 0{
+				return .delete
+			}
             return .none
         }
         if section.multivaluedOptions.contains(.Insert) && indexPath.row == section.count - 1 {
@@ -961,6 +962,20 @@ extension FormViewController : UITableViewDelegate {
     open func tableView(_ tableView: UITableView, shouldIndentWhileEditingRowAt indexPath: IndexPath) -> Bool {
         return self.tableView(tableView, editingStyleForRowAt: indexPath) != .none
     }
+
+	@available(iOS 11,*)
+	public func tableView(_ tableView: UITableView, leadingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+		return form[indexPath].leadingSwipe.contextualConfiguration
+	}
+
+	@available(iOS 11,*)
+	public func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+		return form[indexPath].trailingSwipe.contextualConfiguration
+	}
+
+	public func tableView(_ tableView: UITableView, editActionsForRowAt indexPath: IndexPath) -> [UITableViewRowAction]?{
+		return form[indexPath].trailingSwipe.contextualActions as? [UITableViewRowAction]
+	}
 }
 
 extension FormViewController : UITableViewDataSource {
@@ -987,6 +1002,15 @@ extension FormViewController : UITableViewDataSource {
     open func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
         return form[section].footer?.title
     }
+
+
+    open func sectionIndexTitles(for tableView: UITableView) -> [String]? {
+        return nil
+    }
+
+    open func tableView(_ tableView: UITableView, sectionForSectionIndexTitle title: String, at index: Int) -> Int {
+        return 0
+    }
 }
 
 
@@ -1007,7 +1031,7 @@ extension FormViewController {
     /**
      Called when the keyboard will appear. Adjusts insets of the tableView and scrolls it if necessary.
      */
-    open func keyboardWillShow(_ notification: Notification) {
+    @objc open func keyboardWillShow(_ notification: Notification) {
         guard let table = tableView, let cell = table.findFirstResponder()?.formCell() else { return }
         let keyBoardInfo = notification.userInfo!
         let endFrame = keyBoardInfo[UIKeyboardFrameEndUserInfoKey] as! NSValue
@@ -1035,7 +1059,7 @@ extension FormViewController {
     /**
      Called when the keyboard will disappear. Adjusts insets of the tableView.
      */
-    open func keyboardWillHide(_ notification: Notification) {
+    @objc open func keyboardWillHide(_ notification: Notification) {
         guard let table = tableView, let oldBottom = oldBottomInset else { return }
         let keyBoardInfo = notification.userInfo!
         var tableInsets = table.contentInset
@@ -1058,11 +1082,11 @@ extension FormViewController {
 
     // MARK: Navigation Methods
 
-    func navigationDone(_ sender: UIBarButtonItem) {
+    @objc func navigationDone(_ sender: UIBarButtonItem) {
         tableView?.endEditing(true)
     }
 
-    func navigationAction(_ sender: UIBarButtonItem) {
+    @objc func navigationAction(_ sender: UIBarButtonItem) {
         navigateTo(direction: sender == navigationAccessoryView.previousButton ? .up : .down)
     }
 
