@@ -394,6 +394,9 @@ open class FormViewController: UIViewController, FormViewControllerProtocol, For
 
     @IBOutlet public var tableView: UITableView!
 
+    /// Whether expanded inline rows should be made visible automatically. Defaults to `true`.
+    open var isInlineRowsMadeVisibleOnExpansion: Bool = true
+
     private lazy var _form: Form = { [weak self] in
         let form = Form()
         form.delegate = self
